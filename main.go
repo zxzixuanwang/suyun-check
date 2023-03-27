@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"io"
+
 	"net/http"
 	"net/url"
 	"strings"
@@ -12,7 +13,7 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
-	"github.com/zxzixuanwang/suyun-check/logbean"
+	logbean "github.com/zxzixuanwang/gokit-logbean"
 )
 
 type returnCode struct {
