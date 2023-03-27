@@ -2,6 +2,7 @@
 ## 用途
 用于签到
 ## 具体使用
+```bash
   -checkUri string
         签到的路径资源 (default "/user/checkin")
   -level string
@@ -14,3 +15,4 @@
         输入密码 (default "password")
   -username string
         输入用户名 (default "username")
+```
