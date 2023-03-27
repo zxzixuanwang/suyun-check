@@ -36,11 +36,13 @@ var (
 		"https://suyunti99.com",
 		"https://suyunti2.com",
 	}
-	loginUri *string
-	checkUri *string
-	logLevel *string
-	urlInput *string
-	protocol *string
+	loginUri          *string
+	checkUri          *string
+	logLevel          *string
+	urlInput          *string
+	protocol          *string
+	loginUnameRequest *string
+	loginUpassRequest *string
 )
 
 func main() {
@@ -52,6 +54,9 @@ func main() {
 	logLevel = flag.String("level", "info", "日志等级")
 	urlInput = flag.String("urls", "", "输入访问的urls,','隔开")
 	protocol = flag.String("protocol", "https", "http or https,默认: https")
+	loginUnameRequest = flag.String("name-request", "email", "登陆用户名的参数,默认: email")
+	loginUpassRequest = flag.String("pass-request", "passwd", "登陆密码的参数,默认: passwd")
+
 	flag.Parse()
 
 	if username == nil || password == nil {
@@ -84,8 +89,8 @@ func main() {
 
 		loginUrl := urlOne + *loginUri
 		form := url.Values{}
-		form.Add("email", *username)
-		form.Add("passwd", *password)
+		form.Add(*loginUnameRequest, *username)
+		form.Add(*loginUpassRequest, *password)
 		bf := bytes.NewBufferString(form.Encode())
 		level.Debug(l).Log("request", bf.String())
 
