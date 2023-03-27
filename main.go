@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 
 	"net/http"
@@ -22,6 +23,7 @@ type returnCode struct {
 }
 
 var (
+	l           log.Logger
 	username    *string
 	password    *string
 	logPosition *string
@@ -37,6 +39,8 @@ var (
 	loginUri *string
 	checkUri *string
 	logLevel *string
+	urlInput *string
+	protocol *string
 )
 
 func main() {
@@ -46,20 +50,32 @@ func main() {
 	loginUri = flag.String("loginUri", "/auth/login", "登陆的路径资源")
 	checkUri = flag.String("checkUri", "/user/checkin", "签到的路径资源")
 	logLevel = flag.String("level", "info", "日志等级")
+	urlInput = flag.String("urls", "", "输入访问的urls,','隔开")
+	protocol = flag.String("protocol", "https", "http or https,默认: https")
 	flag.Parse()
 
 	if username == nil || password == nil {
 		panic("密码或者用户名为空")
 	}
-
 	if strings.HasPrefix(*loginUri, "/") {
 		*loginUri = "/" + *loginUri
 	}
 	if strings.HasPrefix(*checkUri, "/") {
 		*checkUri = "/" + *checkUri
 	}
+	if urlInput != nil && *urlInput != "" {
+		urlS = strings.Split(*urlInput, ",")
+		if len(urlS) < 1 {
+			panic("no url")
+		}
+		for i := 0; i < len(urlS); i++ {
+			if !(strings.HasPrefix(urlS[i], "http") || strings.HasPrefix(urlS[i], "https")) {
+				urlS[i] = fmt.Sprintf("%s://%s", *protocol, urlS[i])
+			}
+		}
+	}
 
-	l := logbean.GetLog(logbean.NewLogInfo(*logPosition, *logLevel))
+	l = logbean.GetLog(logbean.NewLogInfo(*logPosition, *logLevel))
 	okFlag := true
 	level.Debug(l).Log("username", *username, "password", *password)
 	checkUrlOne := ""
@@ -72,23 +88,15 @@ func main() {
 		form.Add("passwd", *password)
 		bf := bytes.NewBufferString(form.Encode())
 		level.Debug(l).Log("request", bf.String())
-		req, err := http.NewRequest("POST", loginUrl, bf)
-		if err != nil {
-			level.Error(l).Log("请求失败new request", err)
-			return
-		}
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		client := &http.Client{}
-		client.Timeout = time.Minute
-		resp, err := client.Do(req)
+		resp, err := request(POST, loginUrl, nil, map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, bf)
 		if err != nil {
-
 			level.Error(l).Log("请求失败Do", err)
 			continue
 		}
 		defer resp.Body.Close()
-		answer := readIo(resp.Body, l)
+
+		answer := readIo(resp.Body)
 		if answer != nil &&
 			resp.StatusCode == http.StatusOK &&
 			answer.Ret != 1 {
@@ -107,35 +115,59 @@ func main() {
 		}
 	}
 	if okFlag {
-		level.Error(l).Log("all url ", "down")
+		level.Error(l).Log("all url", "down")
 		return
 	}
+
 	checkUrlOne = checkUrlOne + *checkUri
-
-	req, err := http.NewRequest("POST", checkUrlOne, nil)
+	resp, err := request(POST, checkUrlOne, cookies, map[string]string{"Content-Type": "application/json"}, nil)
 	if err != nil {
-		level.Error(l).Log("login requet error", err)
-
-		return
+		if err != nil {
+			level.Error(l).Log("check requet error", err)
+			return
+		}
 	}
-	req.Header.Set("Content-Type", "application/json")
-	for k, v := range cookies {
-		cookie := http.Cookie{Name: k, Value: v}
-		req.AddCookie(&cookie)
+
+	defer resp.Body.Close()
+	readIo(resp.Body)
+}
+
+type HttpMethod string
+
+const (
+	POST HttpMethod = "POST"
+	GET  HttpMethod = "GET"
+	PUT  HttpMethod = "PUT"
+)
+
+func request(method HttpMethod, url string,
+	cookies map[string]string,
+	header map[string]string,
+	body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequest(string(method), url, body)
+	if err != nil {
+		level.Error(l).Log("请求失败new request", err)
+		return nil, err
+	}
+	if len(cookies) > 0 {
+		for k, v := range cookies {
+			cookie := http.Cookie{Name: k, Value: v}
+			req.AddCookie(&cookie)
+		}
+	}
+	if len(header) > 0 {
+		for k, v := range header {
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set(k, v)
+		}
 	}
 
 	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		level.Error(l).Log("check requet error", err)
-
-		return
-	}
-	defer resp.Body.Close()
-	readIo(resp.Body, l)
+	client.Timeout = time.Minute
+	return client.Do(req)
 }
 
-func readIo(r io.Reader, l log.Logger) *returnCode {
+func readIo(r io.Reader) *returnCode {
 	tempBody, err := io.ReadAll(r)
 	if err != nil {
 		level.Error(l).Log("read resp err", err)
