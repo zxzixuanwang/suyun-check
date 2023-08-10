@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	logbean "github.com/zxzixuanwang/gokit-logbean"
 )
 
@@ -23,7 +21,7 @@ type returnCode struct {
 }
 
 var (
-	l           log.Logger
+	l           logbean.LogBeanService
 	username    *string
 	password    *string
 	logPosition *string
@@ -79,10 +77,9 @@ func main() {
 			}
 		}
 	}
-
-	l = logbean.GetLog(logbean.NewLogInfo(*logPosition, *logLevel))
+	l = logbean.InitLogBean(logbean.WithFilePostion(*logPosition), logbean.WithLevel(*logLevel))
 	okFlag := true
-	level.Debug(l).Log("username", *username, "password", *password)
+	l.Debug("username", *username, "password", *password)
 	checkUrlOne := ""
 	cookies := make(map[string]string)
 	for _, urlOne := range urlS {
@@ -92,11 +89,11 @@ func main() {
 		form.Add(*loginUnameRequest, *username)
 		form.Add(*loginUpassRequest, *password)
 		bf := bytes.NewBufferString(form.Encode())
-		level.Debug(l).Log("request", bf.String())
+		l.Debug("request", bf.String())
 
 		resp, err := request(POST, loginUrl, nil, map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, bf)
 		if err != nil {
-			level.Error(l).Log("请求失败Do", err)
+			l.Error("请求失败Do", err)
 			continue
 		}
 		defer resp.Body.Close()
@@ -106,13 +103,13 @@ func main() {
 			resp.StatusCode == http.StatusOK &&
 			answer.Ret != 1 {
 
-			level.Error(l).Log("out", answer.Msg)
+			l.Error("out", answer.Msg)
 			return
 		}
 		if resp.StatusCode == http.StatusOK {
 			checkUrlOne = urlOne
 			for _, cookie := range resp.Cookies() {
-				level.Info(l).Log("cookie", *cookie)
+				l.Info("cookie", *cookie)
 				cookies[cookie.Name] = cookie.Value
 			}
 			okFlag = false
@@ -120,7 +117,7 @@ func main() {
 		}
 	}
 	if okFlag {
-		level.Error(l).Log("all url", "down")
+		l.Error("all url", "down")
 		return
 	}
 
@@ -128,7 +125,7 @@ func main() {
 	resp, err := request(POST, checkUrlOne, cookies, map[string]string{"Content-Type": "application/json"}, nil)
 	if err != nil {
 		if err != nil {
-			level.Error(l).Log("check requet error", err)
+			l.Error("check requet error", err)
 			return
 		}
 	}
@@ -151,7 +148,7 @@ func request(method HttpMethod, url string,
 	body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest(string(method), url, body)
 	if err != nil {
-		level.Error(l).Log("请求失败new request", err)
+		l.Error("请求失败new request", err)
 		return nil, err
 	}
 	if len(cookies) > 0 {
@@ -175,15 +172,15 @@ func request(method HttpMethod, url string,
 func readIo(r io.Reader) *returnCode {
 	tempBody, err := io.ReadAll(r)
 	if err != nil {
-		level.Error(l).Log("read resp err", err)
+		l.Error("read resp err", err)
 	}
 	answer := new(returnCode)
 	err = json.Unmarshal(tempBody, answer)
 	if err != nil {
-		level.Error(l).Log("unmarshal json err", err)
-		level.Debug(l).Log("out", string(tempBody))
+		l.Error("unmarshal json err", err)
+		l.Debug("out", string(tempBody))
 	} else {
-		level.Info(l).Log("out", string(answer.Msg), "ret code", answer.Ret)
+		l.Info("out", string(answer.Msg), "ret code", answer.Ret)
 	}
 	return answer
 }
