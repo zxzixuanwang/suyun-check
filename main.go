@@ -93,7 +93,7 @@ func main() {
 
 		resp, err := request(POST, loginUrl, nil, map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, bf)
 		if err != nil {
-			l.Error("请求失败Do", err)
+			l.Error("请求失败 error", err)
 			continue
 		}
 		defer resp.Body.Close()
